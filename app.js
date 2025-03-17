@@ -40,21 +40,23 @@ const wordList = ["Russia", "Canada", "China", "USA", "Brazil", "Australia", "In
 
 // Function to shuffle a single word
 function shuffleWord(word) {
-  return shuffle(word);
+  return word.split('').sort(() => Math.random() - 0.5).join('');
 }
 
+// Scramble Game Component
 function ScrambleGame() {
-  const maxStrikes = 3; // Maximum wrong guesses allowed
-  const maxPasses = 3; // Maximum times the player can skip a word
+  const maxStrikes = 3;
+  const maxPasses = 3;
 
   // Load game state from localStorage or initialize with default values
-  const [words, setWords] = useState(() => JSON.parse(localStorage.getItem("words")) || shuffle([...wordList]));
+  const [words, setWords] = useState(() => JSON.parse(localStorage.getItem("words")) || [...wordList]);
   const [currentWord, setCurrentWord] = useState(() => shuffleWord(words[0] || ""));
   const [score, setScore] = useState(() => Number(localStorage.getItem("score")) || 0);
   const [strikes, setStrikes] = useState(() => Number(localStorage.getItem("strikes")) || 0);
   const [passes, setPasses] = useState(() => Number(localStorage.getItem("passes")) || maxPasses);
   const [input, setInput] = useState("");
   const [gameOver, setGameOver] = useState(false);
+  const [message, setMessage] = useState(""); // Added message feedback
 
   // Save game state whenever values change
   useEffect(() => {
@@ -64,43 +66,60 @@ function ScrambleGame() {
     localStorage.setItem("passes", passes);
   }, [words, score, strikes, passes]);
 
-  // Function to handle user guess
+  // Handle user guess
   function handleGuess() {
-    if (input.toLowerCase() === words[0].toLowerCase()) {
-      setScore(score + 1);
+    if (input.trim().toLowerCase() === words[0].trim().toLowerCase()) {
+      setScore(prev => prev + 1);
+      setMessage("✅ Correct!");
       moveToNextWord();
     } else {
-      setStrikes(strikes + 1);
-      if (strikes + 1 >= maxStrikes) setGameOver(true);
+      setStrikes(prev => {
+        const newStrikes = prev + 1;
+        if (newStrikes >= maxStrikes) setGameOver(true);
+        return newStrikes;
+      });
+      setMessage("❌ Incorrect!");
     }
-    setInput(""); // Clear input field after guess
+    setInput("");
   }
 
-  // Function to move to the next word after a correct guess or pass
+  // Move to the next word
   function moveToNextWord() {
     const newWords = words.slice(1);
     setWords(newWords);
-    setCurrentWord(newWords.length > 0 ? shuffleWord(newWords[0]) : "");
-    if (newWords.length === 0) setGameOver(true);
+    if (newWords.length > 0) {
+      setCurrentWord(shuffleWord(newWords[0]));
+    } else {
+      setCurrentWord("");
+      setGameOver(true);
+    }
   }
 
-  // Function to handle pass (skip the word)
+  // Handle pass button
   function handlePass() {
     if (passes > 0) {
-      setPasses(passes - 1);
+      setPasses(prev => prev - 1);
+      setMessage("⏭️ Skipped!");
       moveToNextWord();
     }
   }
 
-  // Function to reset the game when it's over
+  // Reset the game
   function resetGame() {
-    setWords(shuffle([...wordList]));
-    setCurrentWord(shuffleWord(wordList[0]));
+    const shuffledWords = [...wordList];
+    setWords(shuffledWords);
+    setCurrentWord(shuffleWord(shuffledWords[0]));
     setScore(0);
     setStrikes(0);
     setPasses(maxPasses);
     setGameOver(false);
-    localStorage.clear();
+    setMessage("");
+
+    // Remove only game-related localStorage items
+    localStorage.removeItem("words");
+    localStorage.removeItem("score");
+    localStorage.removeItem("strikes");
+    localStorage.removeItem("passes");
   }
 
   return (
@@ -114,15 +133,16 @@ function ScrambleGame() {
         </div>
       ) : (
         <div>
-          <h2>Word: {currentWord}</h2>
+          <h2>Word: {currentWord || "Loading..."}</h2>
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleGuess()}
+            onKeyDown={(e) => e.key === "Enter" && handleGuess()} 
           />
           <button onClick={handleGuess}>Submit</button>
           <button onClick={handlePass} disabled={passes === 0}>Pass ({passes} left)</button>
+          <p className={`message ${message.includes("Correct") ? "success" : "error"}`}>{message}</p>
           <p>Score: {score}</p>
           <p>Strikes: {strikes}/{maxStrikes}</p>
         </div>
@@ -131,5 +151,5 @@ function ScrambleGame() {
   );
 }
 
-// Render the game inside the webpage
-ReactDOM.createRoot(document.body).render(<ScrambleGame />);
+// Rendering into #root div
+ReactDOM.createRoot(document.getElementById("root")).render(<ScrambleGame />);
